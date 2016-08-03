@@ -22,7 +22,7 @@ export class Authentication {
     this.refreshToken         = null;
     this.payload              = null;
     this.exp                  = null;
-    this.hasDataStored        = false;
+    this.hasTokenAnalyzed     = false;
   }
 
 
@@ -80,12 +80,11 @@ export class Authentication {
       this.storage.set(this.config.storageKey, JSON.stringify(response));
       return;
     }
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.payload = null;
-    this.exp = null;
-
-    this.hasDataStored = false;
+    this.accessToken      = null;
+    this.refreshToken     = null;
+    this.payload          = null;
+    this.exp              = null;
+    this.hasTokenAnalyzed = false;
 
     this.storage.remove(this.config.storageKey);
   }
@@ -94,22 +93,22 @@ export class Authentication {
   /* get data, update if needed first */
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -157,7 +156,7 @@ export class Authentication {
 
     this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
 
-    this.hasDataStored = true;
+    this.hasTokenAnalyzed = true;
 
     return {
       accessToken: this.accessToken,

@@ -334,7 +334,7 @@ describe('Authentication', () => {
     it('Should set data from non-JWT response', () => {
       authentication.getDataFromResponse({access_token: 'token'});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.hasTokenAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe('token');
       expect(authentication.payload).toBe(null);
       expect(Number.isNaN(authentication.exp)).toBe(true);
@@ -343,7 +343,7 @@ describe('Authentication', () => {
     it('Should set data from JWT-like response', () => {
       authentication.getDataFromResponse({access_token: 'xx.yy.zz'});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.hasTokenAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe('xx.yy.zz');
       expect(authentication.payload).toBe(null);
       expect(Number.isNaN(authentication.exp)).toBe(true);
@@ -352,7 +352,7 @@ describe('Authentication', () => {
     it('Should set data from JWT response', () => {
       authentication.getDataFromResponse({access_token: tokenFuture.jwt});
 
-      expect(authentication.hasDataStored).toBe(true);
+      expect(authentication.hasTokenAnalyzed).toBe(true);
       expect(authentication.accessToken).toBe(tokenFuture.jwt);
       expect(JSON.stringify(authentication.payload)).toBe(JSON.stringify(tokenFuture.payload));
       expect(authentication.exp).toBe(Number(tokenFuture.payload.exp));
