@@ -183,9 +183,10 @@ export class BaseConfig {
   loginOnSignup = true;
   // If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
   signupRedirect = '#/login';
-  // redirect  when token expires. 0 = don't redirect (default), 1 = use logoutRedirect, string = redirect there
-  expiredRedirect = 0;
-
+  // reload page when token expires. 0 = don't reload (default), 1 = do reload page
+  expiredReload = 0;
+  // reload page when storage changed aka login/logout in other tabs/windows. 0 = don't reload (default), 1 = do reload page
+  storageChangedReload = 0;
 
   // API related options
   // ===================
@@ -740,7 +741,7 @@ export class Authentication {
     this.refreshToken         = null;
     this.payload              = null;
     this.exp                  = null;
-    this.hasDataStored        = false;
+    this.hasTokenAnalyzed     = false;
   }
 
 
@@ -798,12 +799,11 @@ export class Authentication {
       this.storage.set(this.config.storageKey, JSON.stringify(response));
       return;
     }
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.payload = null;
-    this.exp = null;
-
-    this.hasDataStored = false;
+    this.accessToken      = null;
+    this.refreshToken     = null;
+    this.payload          = null;
+    this.exp              = null;
+    this.hasTokenAnalyzed = false;
 
     this.storage.remove(this.config.storageKey);
   }
@@ -812,22 +812,22 @@ export class Authentication {
   /* get data, update if needed first */
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -875,7 +875,7 @@ export class Authentication {
 
     this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
 
-    this.hasDataStored = true;
+    this.hasTokenAnalyzed = true;
 
     return {
       accessToken: this.accessToken,
@@ -948,7 +948,7 @@ export class Authentication {
     return providerLogin.open(this.config.providers[name], userData);
   }
 
-  redirect(redirectUrl, defaultRedirectUrl) {
+  redirect(redirectUrl, defaultRedirectUrl, query) {
     // stupid rule to keep it BC
     if (redirectUrl === true) {
       LogManager.getLogger('authentication').warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === 0 instead.');
@@ -963,9 +963,9 @@ export class Authentication {
       return;
     }
     if (typeof redirectUrl === 'string') {
-      PLATFORM.location.href = encodeURI(redirectUrl);
+      PLATFORM.location.href = encodeURI(redirectUrl + (query ? `?${buildQueryString(query)}` : ''));
     } else if (defaultRedirectUrl) {
-      PLATFORM.location.href = defaultRedirectUrl;
+      PLATFORM.location.href = defaultRedirectUrl + (query ? `?${buildQueryString(query)}` : '');
     }
   }
 }
@@ -1016,7 +1016,7 @@ export class AuthService {
 
     // get token stored in previous format over
     const oldStorageKey = config.tokenPrefix
-                        ? config.tokenPrefix + '_' + config.tokenName
+                        ? `${config.tokenPrefix}_${config.tokenName}`
                         : config.tokenName;
     const oldToken = authentication.storage.get(oldStorageKey);
 
@@ -1030,7 +1030,32 @@ export class AuthService {
 
     // initialize status by resetting if existing stored responseObject
     this.setResponseObject(this.authentication.getResponseObject());
+
+    // listen to storage events in case the user logs in or out in another tab/window
+    PLATFORM.addEventListener('storage', this.storageEventHandler);
   }
+
+  /**
+   * The handler used for storage events. Detects and handles authentication changes in other tabs/windows
+   *
+   * @param {StorageEvent}
+   */
+  storageEventHandler = event => {
+    if (event.key === this.config.storageKey) {
+      LogManager.getLogger('authentication').info('Stored token changed event');
+
+      let wasAuthenticated = this.authenticated;
+      this.authentication.hasTokenAnalyzed = false;
+      this.updateAuthenticated();
+
+      if (this.config.storageChangedReload) {
+        if (wasAuthenticated !== this.authenticated) {
+          PLATFORM.location.reload();
+        }
+      }
+    }
+  }
+
 
   /**
    * Getter: The configured client for all aurelia-authentication requests
@@ -1060,7 +1085,11 @@ export class AuthService {
         && this.authentication.getRefreshToken()) {
         this.updateToken();
       } else {
-        this.logout(this.config.expiredRedirect);
+        this.setResponseObject(null);
+
+        if (this.config.expiredReload) {
+          PLATFORM.location.reload();
+        }
       }
     }, ttl);
   }
@@ -1081,9 +1110,16 @@ export class AuthService {
    * @param {Object} response The servers response as GOJO
    */
   setResponseObject(response) {
-    this.clearTimeout();
-
     this.authentication.setResponseObject(response);
+
+    this.updateAuthenticated();
+  }
+
+  /**
+   * Update authenticated. Sets login status and timeout
+   */
+  updateAuthenticated() {
+    this.clearTimeout();
 
     let wasAuthenticated = this.authenticated;
     this.authenticated = this.authentication.isAuthenticated();
@@ -1156,11 +1192,13 @@ export class AuthService {
   }
 
  /**
-  * Gets authentication status
+  * Gets authentication status from storage
   *
   * @returns {Boolean} For Non-JWT and unexpired JWT: true, else: false
   */
   isAuthenticated() {
+    this.authentication.hasTokenAnalyzed = false;
+
     let authenticated = this.authentication.isAuthenticated();
 
     // auto-update token?
@@ -1259,8 +1297,8 @@ export class AuthService {
     let content;
 
     if (typeof arguments[0] === 'object') {
-      content = arguments[0];
-      options = arguments[1];
+      content     = arguments[0];
+      options     = arguments[1];
       redirectUri = arguments[2];
     } else {
       content = {
@@ -1294,9 +1332,9 @@ export class AuthService {
     let content;
 
     if (typeof arguments[0] === 'object') {
-      content             = arguments[0];
+      content              = arguments[0];
       optionsOrRedirectUri = arguments[1];
-      redirectUri         = arguments[2];
+      redirectUri          = arguments[2];
     } else {
       content = {
         'email': emailOrCredentials,
@@ -1322,15 +1360,15 @@ export class AuthService {
   /**
    * logout locally and redirect to redirectUri (if set) or redirectUri of config. Sends logout request first, if set in config
    *
-   * @param {[String]}    [redirectUri]                      [optional redirectUri overwrite]
+   * @param {[String]}    [redirectUri]                     [optional redirectUri overwrite]
    *
    * @return {Promise<>|Promise<Object>|Promise<Error>}     Server response as Object
    */
-  logout(redirectUri) {
+  logout(redirectUri, query) {
     let localLogout = response => new Promise(resolve => {
       this.setResponseObject(null);
 
-      this.authentication.redirect(redirectUri, this.config.logoutRedirect);
+      this.authentication.redirect(redirectUri, this.config.logoutRedirect, query);
 
       if (typeof this.onLogout === 'function') {
         this.onLogout(response);

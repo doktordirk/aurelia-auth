@@ -60,8 +60,11 @@ export declare class BaseConfig {
   // If loginOnSignup == false: The SPA url to which the user is redirected after a successful signup (else loginRedirect is used)
   signupRedirect: any;
   
-  // redirect  when token expires. 0 = don't redirect (default), 1 = use logoutRedirect, string = redirect there
-  expiredRedirect: any;
+  // reload page when token expires. 0 = don't reload (default), 1 = do reload page
+  expiredReload: any;
+  
+  // reload page when storage changed aka login/logout in other tabs/windows. 0 = don't reload (default), 1 = do reload page
+  storageChangedReload: any;
   
   // API related options
   // ===================
@@ -231,7 +234,7 @@ export declare class Authentication {
      * @return {Promise<response>}
      */
   authenticate(name?: any, userData?: any): any;
-  redirect(redirectUrl?: any, defaultRedirectUrl?: any): any;
+  redirect(redirectUrl?: any, defaultRedirectUrl?: any, query?: any): any;
 }
 export declare class AuthService {
   
@@ -274,6 +277,13 @@ export declare class AuthService {
   constructor(authentication?: any, config?: any, bindingSignaler?: any, eventAggregator?: any);
   
   /**
+     * The handler used for storage events. Detects and handles authentication changes in other tabs/windows
+     *
+     * @param {StorageEvent}
+     */
+  storageEventHandler: any;
+  
+  /**
      * Getter: The configured client for all aurelia-authentication requests
      *
      * @return {HttpClient}
@@ -299,6 +309,11 @@ export declare class AuthService {
      * @param {Object} response The servers response as GOJO
      */
   setResponseObject(response?: any): any;
+  
+  /**
+     * Update authenticated. Sets login status and timeout
+     */
+  updateAuthenticated(): any;
   
   /**
      * Get current user profile from server
@@ -335,7 +350,7 @@ export declare class AuthService {
   getRefreshToken(): any;
   
   /**
-    * Gets authentication status
+    * Gets authentication status from storage
     *
     * @returns {Boolean} For Non-JWT and unexpired JWT: true, else: false
     */
@@ -404,11 +419,11 @@ export declare class AuthService {
   /**
      * logout locally and redirect to redirectUri (if set) or redirectUri of config. Sends logout request first, if set in config
      *
-     * @param {[String]}    [redirectUri]                      [optional redirectUri overwrite]
+     * @param {[String]}    [redirectUri]                     [optional redirectUri overwrite]
      *
      * @return {Promise<>|Promise<Object>|Promise<Error>}     Server response as Object
      */
-  logout(redirectUri?: any): any;
+  logout(redirectUri?: any, query?: any): any;
   
   /**
      * Authenticate with third-party and redirect to redirectUri (if set) or redirectUri of config

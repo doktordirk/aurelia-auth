@@ -168,7 +168,8 @@ export let BaseConfig = class BaseConfig {
     this.loginRoute = '/login';
     this.loginOnSignup = true;
     this.signupRedirect = '#/login';
-    this.expiredRedirect = 0;
+    this.expiredReload = 0;
+    this.storageChangedReload = 0;
     this.baseUrl = '';
     this.loginUrl = '/auth/login';
     this.logoutUrl = null;
@@ -653,7 +654,7 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     this.refreshToken = null;
     this.payload = null;
     this.exp = null;
-    this.hasDataStored = false;
+    this.hasTokenAnalyzed = false;
   }
 
   getLoginRoute() {
@@ -704,29 +705,28 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     this.refreshToken = null;
     this.payload = null;
     this.exp = null;
-
-    this.hasDataStored = false;
+    this.hasTokenAnalyzed = false;
 
     this.storage.remove(this.config.storageKey);
   }
 
   getAccessToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.accessToken;
   }
 
   getRefreshToken() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.refreshToken;
   }
 
   getPayload() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.payload;
   }
 
   getExp() {
-    if (!this.hasDataStored) this.getDataFromResponse(this.getResponseObject());
+    if (!this.hasTokenAnalyzed) this.getDataFromResponse(this.getResponseObject());
     return this.exp;
   }
 
@@ -770,7 +770,7 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
 
     this.exp = this.payload ? parseInt(this.payload.exp, 10) : NaN;
 
-    this.hasDataStored = true;
+    this.hasTokenAnalyzed = true;
 
     return {
       accessToken: this.accessToken,
@@ -833,7 +833,7 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
     return providerLogin.open(this.config.providers[name], userData);
   }
 
-  redirect(redirectUrl, defaultRedirectUrl) {
+  redirect(redirectUrl, defaultRedirectUrl, query) {
     if (redirectUrl === true) {
       LogManager.getLogger('authentication').warn('DEPRECATED: Setting redirectUrl === true to actually *not redirect* is deprecated. Set redirectUrl === 0 instead.');
       return;
@@ -847,9 +847,9 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
       return;
     }
     if (typeof redirectUrl === 'string') {
-      PLATFORM.location.href = encodeURI(redirectUrl);
+      PLATFORM.location.href = encodeURI(redirectUrl + (query ? `?${ buildQueryString(query) }` : ''));
     } else if (defaultRedirectUrl) {
-      PLATFORM.location.href = defaultRedirectUrl;
+      PLATFORM.location.href = defaultRedirectUrl + (query ? `?${ buildQueryString(query) }` : '');
     }
   }
 }, (_applyDecoratedDescriptor(_class7.prototype, 'getLoginRoute', [_dec6], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginRoute'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getLoginRedirect', [_dec7], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginRedirect'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getLoginUrl', [_dec8], Object.getOwnPropertyDescriptor(_class7.prototype, 'getLoginUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getSignupUrl', [_dec9], Object.getOwnPropertyDescriptor(_class7.prototype, 'getSignupUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getProfileUrl', [_dec10], Object.getOwnPropertyDescriptor(_class7.prototype, 'getProfileUrl'), _class7.prototype), _applyDecoratedDescriptor(_class7.prototype, 'getToken', [_dec11], Object.getOwnPropertyDescriptor(_class7.prototype, 'getToken'), _class7.prototype)), _class7)) || _class6);
@@ -859,12 +859,28 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
     this.authenticated = false;
     this.timeoutID = 0;
 
+    this.storageEventHandler = event => {
+      if (event.key === this.config.storageKey) {
+        LogManager.getLogger('authentication').info('Stored token changed event');
+
+        let wasAuthenticated = this.authenticated;
+        this.authentication.hasTokenAnalyzed = false;
+        this.updateAuthenticated();
+
+        if (this.config.storageChangedReload) {
+          if (wasAuthenticated !== this.authenticated) {
+            PLATFORM.location.reload();
+          }
+        }
+      }
+    };
+
     this.authentication = authentication;
     this.config = config;
     this.bindingSignaler = bindingSignaler;
     this.eventAggregator = eventAggregator;
 
-    const oldStorageKey = config.tokenPrefix ? config.tokenPrefix + '_' + config.tokenName : config.tokenName;
+    const oldStorageKey = config.tokenPrefix ? `${ config.tokenPrefix }_${ config.tokenName }` : config.tokenName;
     const oldToken = authentication.storage.get(oldStorageKey);
 
     if (oldToken) {
@@ -876,6 +892,8 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
     }
 
     this.setResponseObject(this.authentication.getResponseObject());
+
+    PLATFORM.addEventListener('storage', this.storageEventHandler);
   }
 
   get client() {
@@ -894,7 +912,11 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
       if (this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
         this.updateToken();
       } else {
-        this.logout(this.config.expiredRedirect);
+        this.setResponseObject(null);
+
+        if (this.config.expiredReload) {
+          PLATFORM.location.reload();
+        }
       }
     }, ttl);
   }
@@ -907,9 +929,13 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
   }
 
   setResponseObject(response) {
-    this.clearTimeout();
-
     this.authentication.setResponseObject(response);
+
+    this.updateAuthenticated();
+  }
+
+  updateAuthenticated() {
+    this.clearTimeout();
 
     let wasAuthenticated = this.authenticated;
     this.authenticated = this.authentication.isAuthenticated();
@@ -956,6 +982,8 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
   }
 
   isAuthenticated() {
+    this.authentication.hasTokenAnalyzed = false;
+
     let authenticated = this.authentication.isAuthenticated();
 
     if (!authenticated && this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
@@ -1058,11 +1086,11 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
     });
   }
 
-  logout(redirectUri) {
+  logout(redirectUri, query) {
     let localLogout = response => new Promise(resolve => {
       this.setResponseObject(null);
 
-      this.authentication.redirect(redirectUri, this.config.logoutRedirect);
+      this.authentication.redirect(redirectUri, this.config.logoutRedirect, query);
 
       if (typeof this.onLogout === 'function') {
         this.onLogout(response);
