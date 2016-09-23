@@ -132,11 +132,11 @@ var Popup = exports.Popup = function () {
       });
 
       _this.popupWindow.addEventListener('exit', function () {
-        reject({ data: 'Provider Popup was closed' });
+        reject(new Error('Provider Popup was closed'));
       });
 
       _this.popupWindow.addEventListener('loaderror', function () {
-        reject({ data: 'Authorization Failed' });
+        reject(new Error('Authorization Failed'));
       });
     });
   };
@@ -145,15 +145,17 @@ var Popup = exports.Popup = function () {
     var _this2 = this;
 
     return new Promise(function (resolve, reject) {
+      var redirectUriPath = getFullUrlPath(_aureliaPal.PLATFORM.global.document.location);
+
       _this2.polling = _aureliaPal.PLATFORM.global.setInterval(function () {
         var errorData = void 0;
 
         try {
-          if (_this2.popupWindow.location.host === _aureliaPal.PLATFORM.global.document.location.host && (_this2.popupWindow.location.search || _this2.popupWindow.location.hash)) {
+          if (getFullUrlPath(_this2.popupWindow.location) === redirectUriPath && (_this2.popupWindow.location.search || _this2.popupWindow.location.hash)) {
             var qs = parseUrl(_this2.popupWindow.location);
 
             if (qs.error) {
-              reject({ error: qs.error });
+              reject(new Error(qs.error));
             } else {
               resolve(qs);
             }
@@ -167,16 +169,10 @@ var Popup = exports.Popup = function () {
 
         if (!_this2.popupWindow) {
           _aureliaPal.PLATFORM.global.clearInterval(_this2.polling);
-          reject({
-            error: errorData,
-            data: 'Provider Popup Blocked'
-          });
+          reject(new Error(errorData));
         } else if (_this2.popupWindow.closed) {
           _aureliaPal.PLATFORM.global.clearInterval(_this2.polling);
-          reject({
-            error: errorData,
-            data: 'Problem poll popup'
-          });
+          reject(new Error(errorData));
         }
       }, 35);
     });
@@ -208,6 +204,10 @@ var parseUrl = function parseUrl(url) {
   var hash = url.hash.charAt(0) === '#' ? url.hash.substr(1) : url.hash;
 
   return (0, _extend2.default)(true, {}, (0, _aureliaPath.parseQueryString)(url.search), (0, _aureliaPath.parseQueryString)(hash));
+};
+
+var getFullUrlPath = function getFullUrlPath(location) {
+  return location.protocol + '//' + location.hostname + ':' + (location.port || (location.protocol === 'https:' ? '443' : '80')) + (/^\//.test(location.pathname) ? location.pathname : '/' + location.pathname);
 };
 
 var BaseConfig = exports.BaseConfig = function () {

@@ -3,7 +3,7 @@
 System.register(["./authFilterValueConverter", "./authenticatedValueConverter", "./authenticatedFilterValueConverter", "extend", "aurelia-logging", "jwt-decode", "aurelia-pal", "aurelia-path", "aurelia-dependency-injection", "aurelia-metadata", "aurelia-event-aggregator", "aurelia-templating-resources", "aurelia-router", "aurelia-fetch-client", "aurelia-api"], function (_export, _context) {
   "use strict";
 
-  var AuthFilterValueConverter, AuthenticatedValueConverter, AuthenticatedFilterValueConverter, extend, LogManager, jwtDecode, PLATFORM, DOM, parseQueryString, join, buildQueryString, inject, deprecated, EventAggregator, BindingSignaler, Redirect, HttpClient, Config, Rest, _dec, _class2, _dec2, _class3, _dec3, _class4, _dec4, _class5, _dec5, _dec6, _dec7, _dec8, _dec9, _dec10, _dec11, _class6, _desc, _value, _class7, _dec12, _dec13, _class8, _desc2, _value2, _class9, _dec14, _class11, _dec15, _class12, _dec16, _class13, _typeof, _createClass, Popup, buildPopupWindowOptions, parseUrl, BaseConfig, Storage, AuthLock, OAuth1, OAuth2, camelCase, Authentication, AuthService, AuthenticateStep, AuthorizeStep, FetchConfig;
+  var AuthFilterValueConverter, AuthenticatedValueConverter, AuthenticatedFilterValueConverter, extend, LogManager, jwtDecode, PLATFORM, DOM, parseQueryString, join, buildQueryString, inject, deprecated, EventAggregator, BindingSignaler, Redirect, HttpClient, Config, Rest, _dec, _class2, _dec2, _class3, _dec3, _class4, _dec4, _class5, _dec5, _dec6, _dec7, _dec8, _dec9, _dec10, _dec11, _class6, _desc, _value, _class7, _dec12, _dec13, _class8, _desc2, _value2, _class9, _dec14, _class11, _dec15, _class12, _dec16, _class13, _typeof, _createClass, Popup, buildPopupWindowOptions, parseUrl, getFullUrlPath, BaseConfig, Storage, AuthLock, OAuth1, OAuth2, camelCase, Authentication, AuthService, AuthenticateStep, AuthorizeStep, FetchConfig;
 
   function _applyDecoratedDescriptor(target, property, decorators, descriptor, context) {
     var desc = {};
@@ -212,11 +212,11 @@ System.register(["./authFilterValueConverter", "./authenticatedValueConverter", 
             });
 
             _this.popupWindow.addEventListener('exit', function () {
-              reject({ data: 'Provider Popup was closed' });
+              reject(new Error('Provider Popup was closed'));
             });
 
             _this.popupWindow.addEventListener('loaderror', function () {
-              reject({ data: 'Authorization Failed' });
+              reject(new Error('Authorization Failed'));
             });
           });
         };
@@ -225,15 +225,17 @@ System.register(["./authFilterValueConverter", "./authenticatedValueConverter", 
           var _this2 = this;
 
           return new Promise(function (resolve, reject) {
+            var redirectUriPath = getFullUrlPath(PLATFORM.global.document.location);
+
             _this2.polling = PLATFORM.global.setInterval(function () {
               var errorData = void 0;
 
               try {
-                if (_this2.popupWindow.location.host === PLATFORM.global.document.location.host && (_this2.popupWindow.location.search || _this2.popupWindow.location.hash)) {
+                if (getFullUrlPath(_this2.popupWindow.location) === redirectUriPath && (_this2.popupWindow.location.search || _this2.popupWindow.location.hash)) {
                   var qs = parseUrl(_this2.popupWindow.location);
 
                   if (qs.error) {
-                    reject({ error: qs.error });
+                    reject(new Error(qs.error));
                   } else {
                     resolve(qs);
                   }
@@ -247,16 +249,10 @@ System.register(["./authFilterValueConverter", "./authenticatedValueConverter", 
 
               if (!_this2.popupWindow) {
                 PLATFORM.global.clearInterval(_this2.polling);
-                reject({
-                  error: errorData,
-                  data: 'Provider Popup Blocked'
-                });
+                reject(new Error(errorData));
               } else if (_this2.popupWindow.closed) {
                 PLATFORM.global.clearInterval(_this2.polling);
-                reject({
-                  error: errorData,
-                  data: 'Problem poll popup'
-                });
+                reject(new Error(errorData));
               }
             }, 35);
           });
@@ -290,6 +286,10 @@ System.register(["./authFilterValueConverter", "./authenticatedValueConverter", 
         var hash = url.hash.charAt(0) === '#' ? url.hash.substr(1) : url.hash;
 
         return extend(true, {}, parseQueryString(url.search), parseQueryString(hash));
+      };
+
+      getFullUrlPath = function getFullUrlPath(location) {
+        return location.protocol + '//' + location.hostname + ':' + (location.port || (location.protocol === 'https:' ? '443' : '80')) + (/^\//.test(location.pathname) ? location.pathname : '/' + location.pathname);
       };
 
       _export("BaseConfig", BaseConfig = function () {
