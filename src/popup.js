@@ -46,11 +46,11 @@ export class Popup {
       });
 
       this.popupWindow.addEventListener('exit', () => {
-        reject({data: 'Provider Popup was closed'});
+        reject(new Error('Provider Popup was closed'));
       });
 
       this.popupWindow.addEventListener('loaderror', () => {
-        reject({data: 'Authorization Failed'});
+        reject(new Error('Authorization Failed'));
       });
     });
   }
@@ -68,7 +68,7 @@ export class Popup {
             const qs = parseUrl(this.popupWindow.location);
 
             if (qs.error) {
-              reject({error: qs.error});
+              reject(new Error(qs.error));
             } else {
               resolve(qs);
             }
@@ -82,16 +82,10 @@ export class Popup {
 
         if (!this.popupWindow) {
           PLATFORM.global.clearInterval(this.polling);
-          reject({
-            error: errorData,
-            data: 'Provider Popup Blocked'
-          });
+          reject(new Error(errorData));
         } else if (this.popupWindow.closed) {
           PLATFORM.global.clearInterval(this.polling);
-          reject({
-            error: errorData,
-            data: 'Problem poll popup'
-          });
+          reject(new Error(errorData));
         }
       }, 35);
     });
