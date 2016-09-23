@@ -57,11 +57,13 @@ export class Popup {
 
   pollPopup() {
     return new Promise((resolve, reject) => {
+      const redirectUriPath   = getFullUrlPath(PLATFORM.global.document.location);
+
       this.polling = PLATFORM.global.setInterval(() => {
         let errorData;
 
         try {
-          if (this.popupWindow.location.host ===  PLATFORM.global.document.location.host
+          if (getFullUrlPath(this.popupWindow.location) === redirectUriPath
             && (this.popupWindow.location.search || this.popupWindow.location.hash)) {
             const qs = parseUrl(this.popupWindow.location);
 
@@ -117,4 +119,10 @@ const parseUrl = url => {
   let hash = (url.hash.charAt(0) === '#') ? url.hash.substr(1) : url.hash;
 
   return extend(true, {}, parseQueryString(url.search), parseQueryString(hash));
+};
+
+const getFullUrlPath = location => {
+  return location.protocol + '//' + location.hostname +
+    ':' + (location.port || (location.protocol === 'https:' ? '443' : '80')) +
+    (/^\//.test(location.pathname) ? location.pathname : '/' + location.pathname);
 };
