@@ -1086,7 +1086,7 @@ define(["exports", "./authFilterValueConverter", "./authenticatedValueConverter"
       this.timeoutID = 0;
 
       this.storageEventHandler = function (event) {
-        if (event.key !== _this8.config.storageKey) {
+        if (event.key !== _this8.config.storageKey || event.newValue === event.oldValue) {
           return;
         }
 
@@ -1103,9 +1103,14 @@ define(["exports", "./authFilterValueConverter", "./authenticatedValueConverter"
         _this8.authentication.responseAnalyzed = false;
         _this8.updateAuthenticated();
 
-        if (_this8.config.storageChangedRedirect && wasAuthenticated !== _this8.authenticated) {
-          _aureliaPal.PLATFORM.location.assign(_this8.config.storageChangedRedirect);
+        if (wasAuthenticated === _this8.authenticated) {
+          return;
         }
+
+        if (_this8.config.storageChangedRedirect) {
+          _aureliaPal.PLATFORM.location.href = _this8.config.storageChangedRedirect;
+        }
+        _aureliaPal.PLATFORM.location.reload();
       };
 
       this.authentication = authentication;
