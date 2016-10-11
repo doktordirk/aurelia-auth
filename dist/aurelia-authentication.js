@@ -1051,11 +1051,7 @@ export class Authentication {
   }
 
   isAuthenticated(): boolean {
-    const isTokenExpired = this.isTokenExpired();
-
-    if (isTokenExpired === undefined) return !!this.accessToken;
-
-    return !isTokenExpired;
+    return !!this.accessToken && !this.isTokenExpired();
   }
 
   /* get and set from response */
@@ -1368,7 +1364,7 @@ export class AuthService {
       if (this.config.autoUpdateToken
         && this.authentication.getAccessToken()
         && this.authentication.getRefreshToken()) {
-        this.updateToken();
+        this.updateToken().catch(_ => _);
 
         return;
       }
@@ -1507,7 +1503,7 @@ export class AuthService {
       && this.authentication.getAccessToken()
       && this.authentication.getRefreshToken()
     ) {
-      this.updateToken();
+      this.updateToken().catch(_ => _);
       authenticated = true;
     }
 

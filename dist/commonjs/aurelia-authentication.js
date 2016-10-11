@@ -901,11 +901,7 @@ var Authentication = exports.Authentication = (_dec5 = (0, _aureliaDependencyInj
   };
 
   Authentication.prototype.isAuthenticated = function isAuthenticated() {
-    var isTokenExpired = this.isTokenExpired();
-
-    if (isTokenExpired === undefined) return !!this.accessToken;
-
-    return !isTokenExpired;
+    return !!this.accessToken && !this.isTokenExpired();
   };
 
   Authentication.prototype.getDataFromResponse = function getDataFromResponse(response) {
@@ -1133,7 +1129,9 @@ var AuthService = exports.AuthService = (_dec12 = (0, _aureliaDependencyInjectio
 
     this.timeoutID = _aureliaPal.PLATFORM.global.setTimeout(function () {
       if (_this9.config.autoUpdateToken && _this9.authentication.getAccessToken() && _this9.authentication.getRefreshToken()) {
-        _this9.updateToken();
+        _this9.updateToken().catch(function (_) {
+          return _;
+        });
 
         return;
       }
@@ -1219,7 +1217,9 @@ var AuthService = exports.AuthService = (_dec12 = (0, _aureliaDependencyInjectio
     var authenticated = this.authentication.isAuthenticated();
 
     if (!authenticated && this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
-      this.updateToken();
+      this.updateToken().catch(function (_) {
+        return _;
+      });
       authenticated = true;
     }
 

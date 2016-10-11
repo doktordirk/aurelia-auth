@@ -831,11 +831,7 @@ export let Authentication = (_dec5 = inject(Storage, BaseConfig, OAuth1, OAuth2,
   }
 
   isAuthenticated() {
-    const isTokenExpired = this.isTokenExpired();
-
-    if (isTokenExpired === undefined) return !!this.accessToken;
-
-    return !isTokenExpired;
+    return !!this.accessToken && !this.isTokenExpired();
   }
 
   getDataFromResponse(response) {
@@ -1034,7 +1030,7 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
 
     this.timeoutID = PLATFORM.global.setTimeout(() => {
       if (this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
-        this.updateToken();
+        this.updateToken().catch(_ => _);
 
         return;
       }
@@ -1120,7 +1116,7 @@ export let AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
     let authenticated = this.authentication.isAuthenticated();
 
     if (!authenticated && this.config.autoUpdateToken && this.authentication.getAccessToken() && this.authentication.getRefreshToken()) {
-      this.updateToken();
+      this.updateToken().catch(_ => _);
       authenticated = true;
     }
 
