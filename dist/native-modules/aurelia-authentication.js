@@ -43,7 +43,7 @@ import * as LogManager from 'aurelia-logging';
 import jwtDecode from 'jwt-decode';
 import { PLATFORM, DOM } from 'aurelia-pal';
 import { parseQueryString, join, buildQueryString } from 'aurelia-path';
-import { inject } from 'aurelia-dependency-injection';
+import { inject, Container } from 'aurelia-dependency-injection';
 import { deprecated } from 'aurelia-metadata';
 import { EventAggregator } from 'aurelia-event-aggregator';
 import { BindingSignaler } from 'aurelia-templating-resources';
@@ -1048,7 +1048,7 @@ export var AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
     this.timeoutID = 0;
 
     this.storageEventHandler = function (event) {
-      if (event.key !== _this8.config.storageKey) {
+      if (event.key !== _this8.config.storageKey || event.newValue === event.oldValue) {
         return;
       }
 
@@ -1065,9 +1065,14 @@ export var AuthService = (_dec12 = inject(Authentication, BaseConfig, BindingSig
       _this8.authentication.responseAnalyzed = false;
       _this8.updateAuthenticated();
 
-      if (_this8.config.storageChangedRedirect && wasAuthenticated !== _this8.authenticated) {
-        PLATFORM.location.assign(_this8.config.storageChangedRedirect);
+      if (wasAuthenticated === _this8.authenticated) {
+        return;
       }
+
+      if (_this8.config.storageChangedRedirect) {
+        PLATFORM.location.href = _this8.config.storageChangedRedirect;
+      }
+      PLATFORM.location.reload();
     };
 
     this.authentication = authentication;
